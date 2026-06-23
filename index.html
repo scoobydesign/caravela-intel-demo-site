@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Caravela Intelligence — Scores Territoriais (protótipo)</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{--ink:#0f2b46;--blue:#0a6ec0;--blue2:#084e88;--gray:#5b6675;--line:#e3e8ee;--bg:#f5f7fa}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Inter,system-ui,sans-serif;color:var(--ink);background:var(--bg);height:100vh;overflow:hidden}
+    .app{display:grid;grid-template-rows:auto auto 1fr;height:100vh}
+    header{background:#fff;border-bottom:1px solid var(--line);padding:10px 18px;display:flex;align-items:center;gap:14px}
+    .logo{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#0a6ec0,#084e88);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px}
+    header h1{font-size:1rem;font-weight:800}header .sub{font-size:.74rem;color:var(--gray)}
+    .tag{margin-left:auto;font-size:.7rem;font-weight:700;color:#92400e;background:#fef3c7;border:1px solid #fde68a;padding:4px 10px;border-radius:999px}
+    .idxbar{background:#fff;border-bottom:1px solid var(--line);padding:8px 18px;display:flex;gap:8px;align-items:center}
+    .idxbar .lbl{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--gray);font-weight:700;margin-right:4px}
+    .idxbtn{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 16px;font-size:13px;font-weight:700;color:var(--gray);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:7px;transition:.15s}
+    .idxbtn .ico{font-size:15px}
+    .idxbtn.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+    #lisaBtn.on{background:#19486a;color:#fff;border-color:#19486a}
+    .csvbtn{width:100%;border:1px solid #0a6ec0;background:#fff;color:#0a6ec0;border-radius:9px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px;transition:.15s}
+    .csvbtn:hover{background:#0a6ec0;color:#fff}
+    .main{display:grid;grid-template-columns:330px 1fr 300px;min-height:0}
+    .panel{background:#fff;overflow:auto;padding:14px 16px}
+    .panel.left{border-right:1px solid var(--line)}.panel.right{border-left:1px solid var(--line)}
+    .map-wrap{position:relative;min-height:0}#map{position:absolute;inset:0}
+    h3{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--gray);margin:14px 0 8px;font-weight:700}
+    h3:first-child{margin-top:0}
+    .idesc{font-size:12px;color:var(--gray);line-height:1.5;background:var(--bg);border-radius:8px;padding:9px 11px;margin-bottom:4px}
+    .seg{display:flex;gap:6px;flex-wrap:wrap}
+    .seg button{flex:1;min-width:84px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px;font-size:11.5px;font-weight:600;color:var(--gray);cursor:pointer;font-family:inherit;transition:.15s}
+    .seg button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+    select{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:13px;font-family:inherit;background:#fff;cursor:pointer}
+    .slider{margin:11px 0}
+    .slider label{display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:3px}
+    .slider label b{color:var(--blue)}
+    .slider input{width:100%;accent-color:var(--blue)}
+    .slider small{font-size:10.5px;color:var(--gray)}
+    .caravela-box{background:linear-gradient(135deg,#0a6ec0,#084e88);color:#fff;border-radius:12px;padding:12px 14px;margin-top:10px}
+    .caravela-box .t{font-size:.78rem;font-weight:800;display:flex;align-items:center;gap:6px;margin-bottom:8px}
+    .cv-chip{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);border:1px dashed rgba(255,255,255,.4);border-radius:8px;padding:6px 9px;margin-bottom:6px;font-size:11.5px}
+    .cv-chip .plus{margin-left:auto;font-weight:800;opacity:.85}
+    .caravela-box .note{font-size:10.5px;opacity:.92;margin-top:6px;line-height:1.45}
+    .method{font-size:10.5px;color:var(--gray);line-height:1.5;background:var(--bg);border-radius:8px;padding:9px 11px;margin-top:10px}
+    .kpi{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+    .kpi .n{font-size:1.35rem;font-weight:800;color:var(--blue2)}.kpi .l{font-size:11px;color:var(--gray)}
+    .rank-row{display:flex;align-items:center;gap:8px;padding:7px 6px;border-bottom:1px solid var(--line);cursor:pointer;border-radius:6px}
+    .rank-row:hover{background:#eef6fd}
+    .rank-row .pos{width:22px;font-weight:800;color:var(--gray);font-size:12px}
+    .rank-row .nm{flex:1;font-weight:600;font-size:12.5px;line-height:1.2}.rank-row .nm small{color:var(--gray);font-weight:400}
+    .rank-row .sc{font-weight:800;color:var(--blue2);font-variant-numeric:tabular-nums}
+    .legend{position:absolute;bottom:14px;left:14px;z-index:5;background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:11.5px;box-shadow:0 6px 20px rgba(0,0,0,.1);max-width:230px}
+    .legend h4{font-size:12px;margin-bottom:7px}
+    .lg-row{display:flex;align-items:center;gap:7px;padding:1px 0}.lg-sw{width:16px;height:11px;border-radius:3px}
+    .legend .nt{margin-top:6px;color:var(--gray);font-size:10px}
+    .loading{position:absolute;inset:0;background:rgba(245,247,250,.95);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:20}
+    .spin{width:36px;height:36px;border:4px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:s .8s linear infinite}@keyframes s{to{transform:rotate(360deg)}}
+    .maplibregl-popup-content{font-family:Inter,sans-serif;padding:10px 12px;border-radius:10px}
+    .pp h5{font-size:13px;margin-bottom:2px}.pp .uf{font-size:10.5px;color:var(--gray)}
+    .pp .big{font-size:1.2rem;font-weight:800;margin:4px 0}
+    .pp table{font-size:11px;border-collapse:collapse;margin-top:4px;width:100%}.pp td{padding:1px 0}.pp td:last-child{text-align:right;font-weight:700;padding-left:10px}
+    .foot{font-size:9.5px;color:var(--gray);margin-top:10px;border-top:1px solid var(--line);padding-top:8px}
+    @media(max-width:980px){.main{grid-template-columns:1fr}.panel.left,.panel.right{max-height:210px}}
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <header>
+      <div class="logo">C</div>
+      <div><h1>Caravela Intelligence</h1><div class="sub">Scores territoriais de decisão — 5.570 municípios</div></div>
+      <span class="tag">PROTÓTIPO · cruzamento de dados</span>
+    </header>
+
+    <div class="idxbar">
+      <span class="lbl">Índice</span>
+      <button class="idxbtn on" data-idx="saude"><span class="ico">🩺</span> GAP de Saúde</button>
+      <button class="idxbtn" data-idx="varejo"><span class="ico">🛒</span> Oportunidade Comercial (IOC)</button>
+      <button class="idxbtn" id="lisaBtn" style="margin-left:auto" title="Clusters espaciais — Local Moran (LISA)"><span class="ico">🔬</span> Clusters espaciais</button>
+    </div>
+
+    <div class="main">
+      <aside class="panel left">
+        <div class="idesc" id="idesc"></div>
+        <h3>Lente de análise</h3>
+        <div class="seg" id="viewSeg">
+          <button data-v="score" class="on">Score</button>
+          <button data-v="heat">🔥 Frente de aquecimento</button>
+          <button data-v="trap">⚠️ Detector de armadilha</button>
+        </div>
+        <div class="idesc" id="viewNote" style="display:none;border-left:3px solid #b45309;background:#fffbeb"></div>
+        <h3>Vertical / preset</h3>
+        <div class="seg" id="vertSeg"></div>
+        <h3>Recorte territorial</h3>
+        <select id="ufSel"><option value="">Brasil — todos os municípios</option></select>
+        <div class="slider" style="margin-top:12px"><label>População mínima <b id="pfv">—</b></label><input type="range" id="popFloor" min="0" max="100" step="5" value="10"><small>ignora mercados pequenos demais para o negócio</small></div>
+        <h3>Pesos do score <span style="text-transform:none;font-weight:400">(ajuste ao vivo)</span></h3>
+        <div id="sliders"></div>
+        <div class="caravela-box" id="cvbox"></div>
+        <div class="method" id="method"></div>
+        <div class="foot">Dados públicos oficiais (IBGE · RAIS · SUS/CNES · CadÚnico) · malha IBGE · protótipo para demonstração comercial.</div>
+      </aside>
+
+      <div class="map-wrap">
+        <div id="map"></div>
+        <div class="legend" id="legend"></div>
+        <div class="loading" id="loading"><div class="spin"></div><div id="loadmsg">Carregando dados oficiais…</div></div>
+      </div>
+
+      <aside class="panel right">
+        <div class="kpi"><div class="n" id="kCount">—</div><div class="l">municípios pontuados</div></div>
+        <button id="csvBtn" class="csvbtn">⬇ Exportar ranking (CSV)</button>
+        <h3 id="rankTitle">Top 30</h3>
+        <div id="rank"></div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const UF={11:'RO',12:'AC',13:'AM',14:'RR',15:'PA',16:'AP',17:'TO',21:'MA',22:'PI',23:'CE',24:'RN',25:'PB',26:'PE',27:'AL',28:'SE',29:'BA',31:'MG',32:'ES',33:'RJ',35:'SP',41:'PR',42:'SC',43:'RS',50:'MS',51:'MT',52:'GO',53:'DF'};
+    const UFNOME={RO:'Rondônia',AC:'Acre',AM:'Amazonas',RR:'Roraima',PA:'Pará',AP:'Amapá',TO:'Tocantins',MA:'Maranhão',PI:'Piauí',CE:'Ceará',RN:'Rio Grande do Norte',PB:'Paraíba',PE:'Pernambuco',AL:'Alagoas',SE:'Sergipe',BA:'Bahia',MG:'Minas Gerais',ES:'Espírito Santo',RJ:'Rio de Janeiro',SP:'São Paulo',PR:'Paraná',SC:'Santa Catarina',RS:'Rio Grande do Sul',MS:'Mato Grosso do Sul',MT:'Mato Grosso',GO:'Goiás',DF:'Distrito Federal'};
+    const RAMP_HEAT=['#FFF7BC','#FEE391','#FEC44F','#FE9929','#EC7014','#CC4C02','#8C2D04'];
+    const RAMP_GREEN=['#EDF8E9','#C7E9C0','#A1D99B','#74C476','#41AB5D','#238B45','#005A32'];
+    const RAMP_FIRE=['#FFF5EB','#FEE6CE','#FDD0A2','#FDAE6B','#FD8D3C','#E6550D','#A63603'];
+    const RAMP_TRAP=['#F7F7F7','#FDD49E','#FDBB84','#FC8D59','#EF6548','#D7301F','#990000'];
+    const NODATA='#E4E8EC';
+    const GCS='https://storage.googleapis.com/maps_js/clientes/onu_ods/dados_indicador/';
+    const FILES={pop:'populacao.csv',renda:'pib_percapita.csv',estSaude:'est_saude.csv',pob:'cadunico_tot_pes_pob.csv',estCom:'est_comercial.csv',mei:'mei.csv',vinc:'vinculo_ativo_31_12.csv',remun:'vl_remun_media_nom.csv'};
+
+    // ---- definição dos índices (config-driven) ----
+    const INDICES={
+      saude:{
+        label:'GAP de Saúde', ramp:RAMP_HEAT, accent:'#CC4C02',
+        desc:'Onde há <b>poder de compra e demanda de saúde</b>, mas <b>baixa oferta</b> — oportunidade para clínica, odonto e laboratório.',
+        needs:['pop','renda','estSaude','pob','remun'],
+        comps:[
+          {key:'mercado',label:'Mercado (massa de renda)',small:'PIB total do município (massa de renda)',raw:d=>Math.log(d.pop*d.renda+1)},
+          {key:'suboferta',label:'Sub-oferta de saúde',small:'poucos estab. de saúde por habitante',raw:d=>-(d.estSaude/d.pop)},
+          {key:'poder',label:'Poder de compra',small:'salário médio formal (RAIS) descontada a pobreza',raw:d=>d.remun*(1-Math.min(1,d.pob/d.pop))},
+        ],
+        presets:{'Odontologia (OralCentter)':[30,35,35],'Clínica popular':[45,40,15],'Laboratório / diagnóstico':[40,30,30]},
+        popFloor:5000,
+        caravela:['🩺 Cobertura de plano de saúde','🛒 Consumo em saúde · classe B+','📈 Crescimento do PIX (Δ12m)'],
+        cvnote:'Com estes, o score deixa de ser "oportunidade" e vira <b>demanda reprimida de plano</b> — com precisão de <b>bairro/CEP</b>.',
+        rankTitle:'Top 30 — maior oportunidade de saúde',
+        fields:[['População',d=>fmt(d.pop)],['PIB per capita',d=>'R$ '+fmt(Math.round(d.renda))],['Estab. saúde / 10 mil hab',d=>(d.estSaude/d.pop*10000).toFixed(1)],['Pobreza (CadÚnico)',d=>(d.pob/d.pop*100).toFixed(0)+'%']],
+      },
+      varejo:{
+        label:'Oportunidade Comercial (IOC)', ramp:RAMP_GREEN, accent:'#238B45',
+        desc:'Onde abrir <b>ponto de varejo</b>: alto <b>poder de compra</b> e <b>dinamismo econômico</b>, com <b>baixa saturação</b> comercial.',
+        needs:['pop','renda','estCom','pob','vinc','mei','remun'],
+        comps:[
+          {key:'mercado',label:'Mercado (massa de renda)',small:'população × PIB per capita (log)',raw:d=>Math.log(d.pop*d.renda+1)},
+          {key:'espaco',label:'Espaço comercial',small:'poucos estab. comerciais/hab = lacuna de oferta',raw:d=>-(d.estCom/d.pop*10000)},
+          {key:'poder',label:'Poder de compra',small:'salário médio formal (RAIS) descontada a pobreza',raw:d=>d.remun*(1-Math.min(1,d.pob/d.pop))},
+          {key:'dinamismo',label:'Dinamismo econômico',small:'empregos formais + MEI + salário (log)',raw:d=>0.40*Math.log(d.vinc+1)+0.35*Math.log(d.mei+1)+0.25*Math.log(d.remun+1)},
+        ],
+        presets:{'Food / alimentação':[25,35,25,15],'Varejo geral':[35,30,25,10],'Serviços':[30,15,30,25]},
+        popFloor:10000,
+        caravela:['📈 Crescimento do PIX (Δ12m)','🛒 Consumo por classe (A/B/C/D)','👷 Projeção de empregos'],
+        cvnote:'Com PIX e consumo por classe da Caravela, o IOC ganha <b>dinâmica em tempo quase real</b> e <b>granularidade de bairro/CEP</b>.',
+        rankTitle:'Top 30 — maior oportunidade comercial',
+        fields:[['População',d=>fmt(d.pop)],['PIB per capita',d=>'R$ '+fmt(Math.round(d.renda))],['Salário médio',d=>'R$ '+fmt(Math.round(d.remun))],['MEI + empregos',d=>fmt(Math.round(d.mei+d.vinc))],['Estab. comerciais',d=>fmt(d.estCom)]],
+      },
+    };
+
+    const DATA={}; let GEO=null,map=null,scoreByCod=new Map(),breaks=[],active='saude',preset='',curUF='',lisaOn=false,lisaResult=null,CENT=null,view='score';
+    const VIEWNOTE={
+      heat:'Indicador de <b>estrutura espacial (estado atual)</b>, não previsão. O nível municipal capta difusão <b>regional</b>, não de bairro. Um cluster Alto-Alto pode indicar mercado <b>já maduro/saturado</b> — cruze sempre com o Detector de armadilha. Janela temporal (18–36m) <b>sob validação</b> (backtest histórico CNES/RAIS em curso).',
+      trap:'Sinal <b>condicionado ao segmento</b>: penaliza negócios de <b>massa/volume</b>; para <b>premium/luxo</b> a desigualdade pode ser oportunidade. Medido em nível municipal (<b>falácia ecológica</b>): um município "armadilha" pode conter um bairro-alvo viável — confirme no raio real. Descritivo, não causal. v1 usa PIB pc × renda formal (RAIS) e CadÚnico como proxy de enclave; mediana salarial e Theil entram com dado RAIS por faixa.',
+    };
+    const QCOLOR={1:'#D7191C',2:'#2C7BB6',3:'#ABD9E9',4:'#FDAE61',0:'#EDF0F2'};
+    const QLABEL={1:'Alto-Alto (hotspot)',2:'Baixo-Baixo',3:'Baixo-Alto',4:'Alto-Baixo (outlier)',0:'Não significativo'};
+    const $=id=>document.getElementById(id);
+    const fmt=n=>n==null?'—':Math.round(n).toLocaleString('pt-BR');
+    const col=(r,...n)=>{for(const k of n)if(r[k]!=null&&r[k]!=='')return r[k];return '';};
+    const num=s=>{if(s==null)return null;s=String(s).trim();if(s===''||s==='-')return null;if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');const n=parseFloat(s);return isNaN(n)?null:n;};
+    function codeOf(r){let c=String(col(r,'Codigo','codigo')||'').trim().split('.')[0];if(c.length===7)c=c.slice(0,6);return c;}
+    function csv(arq){return new Promise(r=>Papa.parse(GCS+arq+'?v='+Date.now(),{download:true,header:true,skipEmptyLines:true,delimiter:';',complete:res=>r(res.data||[]),error:()=>r([])}));}
+
+    async function load(){
+      const keys=Object.keys(FILES);
+      const all=await Promise.all(keys.map(k=>csv(FILES[k])));
+      keys.forEach((k,i)=>all[i].forEach(r=>{const c=codeOf(r);if(c.length!==6)return;(DATA[c]=DATA[c]||{cod:c})[k]=num(col(r,'valor'));if(!DATA[c].nome)DATA[c].nome=col(r,'Municipios','nome','municipio');}));
+      Object.keys(DATA).forEach(c=>DATA[c].uf=UF[+c.slice(0,2)]||'');
+      $('loadmsg').textContent='Carregando malha do mapa…';
+      GEO=await fetch('mun.json').then(r=>r.json());
+      buildUF(); buildIndexUI(); initMap();
+    }
+    function buildUF(){const ufs=[...new Set(Object.values(DATA).map(d=>d.uf).filter(Boolean))].sort();ufs.forEach(u=>{const o=document.createElement('option');o.value=u;o.textContent=`${UFNOME[u]} (${u})`;$('ufSel').appendChild(o);});$('ufSel').onchange=()=>{curUF=$('ufSel').value;recompute();zoomUF();};}
+
+    // ---- UI por índice ----
+    function buildIndexUI(){
+      const I=INDICES[active];
+      $('idesc').innerHTML=I.desc;
+      $('rankTitle').textContent=I.rankTitle;
+      // presets
+      const names=Object.keys(I.presets);preset=names[0];
+      $('vertSeg').innerHTML=names.map((n,i)=>`<button data-p="${n}" class="${i===0?'on':''}">${n}</button>`).join('');
+      $('vertSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{$('vertSeg').querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');preset=b.dataset.p;applyPreset();});
+      // sliders
+      $('sliders').innerHTML=I.comps.map((c,i)=>`<div class="slider"><label>${c.label} <b id="wv${i}">0%</b></label><input type="range" id="w${i}" min="0" max="100"><small>${c.small}</small></div>`).join('');
+      I.comps.forEach((c,i)=>$('w'+i).oninput=()=>{syncW();recompute();});
+      $('popFloor').value=(I.popFloor||0)/1000; updatePF(); $('popFloor').oninput=()=>{updatePF();recompute();};
+      // caravela box
+      $('cvbox').innerHTML=`<div class="t">🔓 Encaixe dos dados exclusivos da Caravela</div>${I.caravela.map(t=>`<div class="cv-chip">${t}<span class="plus">+</span></div>`).join('')}<div class="note">${I.cvnote} (Hoje o protótipo usa proxies públicos.)</div>`;
+      // method
+      $('method').innerHTML=`<b>Cálculo:</b> cada componente é <b>winsorizado (P1/P99)</b> e padronizado (z-score) no recorte, combinado pelos pesos; o agregado vira <b>percentil do recorte (0–100)</b>. Cor por quantis (7 classes). Clusters por <b>Local Moran (LISA)</b> com permutação condicional + correção FDR.<br><b>Natureza:</b> índice de <b>triagem</b> territorial (descritivo), <b>não previsão de vendas</b>. Score relativo ao recorte (Brasil ou UF). Nível municipal: sujeito a <b>MAUP</b> e falácia ecológica — confirme o ponto no raio real. Último ano disponível na base.<br><b>Fontes reais:</b> IBGE, RAIS, SUS/CNES, CadÚnico. <span style="color:#b45309">Dados exclusivos da Caravela (PIX, consumo, cobertura) entram para refinar.</span>`;
+      applyPreset();
+    }
+    function applyPreset(){const p=INDICES[active].presets[preset];INDICES[active].comps.forEach((c,i)=>$('w'+i).value=p[i]);syncW();recompute();}
+    function weights(){const I=INDICES[active];const v=I.comps.map((c,i)=>+$('w'+i).value);const s=v.reduce((a,b)=>a+b,0)||1;return v.map(x=>x/s);}
+    function popFloorVal(){return (+$('popFloor').value)*1000;}
+    function updatePF(){const v=popFloorVal();$('pfv').textContent=v===0?'sem filtro':(v>=1000?(v/1000)+' mil':v);}
+    function syncW(){const w=weights();w.forEach((x,i)=>$('wv'+i).textContent=Math.round(x*100)+'%');}
+
+    // ---- score ----
+    function stat(a){const n=a.length;const m=a.reduce((x,y)=>x+y,0)/n;const sd=Math.sqrt(a.reduce((x,y)=>x+(y-m)**2,0)/n)||1;return {m,sd};}
+    // winsorização P(p)/P(1-p) — limita caudas antes do z-score (robustez a outliers)
+    function winsor(a,p){const s=a.slice().sort((x,y)=>x-y),n=s.length;if(n<3)return a.slice();const lo=s[Math.floor((n-1)*p)],hi=s[Math.ceil((n-1)*(1-p))];return a.map(x=>x<lo?lo:(x>hi?hi:x));}
+    // percentil por rank de cada elemento, em [0,1]
+    function pctRank(a){const idx=a.map((v,i)=>[v,i]).sort((x,y)=>x[0]-y[0]),n=a.length,out=new Array(n);idx.forEach((p,r)=>out[p[1]]=n>1?r/(n-1):0.5);return out;}
+    // ajuste de Benjamini-Hochberg (FDR) sobre vetor de p-valores
+    function bhAdjust(ps){const n=ps.length,idx=ps.map((p,i)=>[p,i]).sort((a,b)=>a[0]-b[0]),adj=new Array(n);let prev=1;for(let k=n-1;k>=0;k--){const p=idx[k][0],i=idx[k][1],v=Math.min(prev,p*n/(k+1));adj[i]=v;prev=v;}return adj;}
+    function recompute(){
+      const I=INDICES[active];const floor=popFloorVal();const items=[];
+      for(const c in DATA){const d=DATA[c];if(curUF&&d.uf!==curUF)continue;if(d.pop==null||d.pop<=0||d.pop<floor)continue;if(I.needs.some(k=>d[k]==null))continue;items.push(d);}
+      if(!items.length){scoreByCod=new Map();render();return;}
+      // componentes winsorizados (P1/P99) antes da padronização → z-score robusto a outliers
+      const raws=I.comps.map(c=>winsor(items.map(d=>c.raw(d)),0.01));
+      const stats=raws.map(r=>stat(r));
+      const w=weights();
+      items.forEach((d,idx)=>{let g=0;const zs=[];I.comps.forEach((c,ci)=>{const z=(raws[ci][idx]-stats[ci].m)/stats[ci].sd;zs.push(z);g+=w[ci]*z;});d._g=g;d._z=zs;});
+      // score = percentil do recorte (robusto a outliers)
+      const sorted=[...items].sort((a,b)=>a._g-b._g);const n=sorted.length;
+      sorted.forEach((d,i)=>d.score=Math.round(n>1?i/(n-1)*100:50));
+      scoreByCod=new Map();items.forEach(d=>scoreByCod.set(d.cod,d));
+      // lentes de análise
+      if(view==='heat')computeHeat(items); else if(view==='trap')computeTrap(items);
+      breaks=quantis(items.map(viewVal),7);
+      lisaResult=lisaOn?lisaClusters(items):null;
+      render();
+    }
+    // valor usado para colorir/rankear conforme a lente ativa
+    function viewVal(d){return view==='heat'?(d._heat??0):view==='trap'?(d._trap??0):d.score;}
+    // ---- LENTE: Frente de aquecimento (contágio espacial) — descritivo, NÃO preditivo ----
+    function computeHeat(items){
+      items.forEach(d=>{d._heat=0;d._heatAA=false;d._lag=null;});
+      const pts=ptsOf(items);const n=pts.length;if(n<10)return;
+      const k=Math.min(8,n-1);const neigh=knnIdx(pts,k);
+      const s=stat(pts.map(p=>p.v));const zg=pts.map(p=>(p.v-s.m)/s.sd);
+      const lag=neigh.map(ns=>{let a=0;for(const j of ns)a+=zg[j];return a/ns.length;});
+      const heatRaw=pts.map((p,i)=>zg[i]+0.5*lag[i]);   // próprio + 0,5 × contágio dos vizinhos
+      const pr=pctRank(heatRaw);
+      const lz=lisaClusters(items)||{};
+      const by={};pts.forEach((p,i)=>by[p.cod]={h:Math.round(pr[i]*100),lag:lag[i],aa:lz[p.cod]===1});
+      items.forEach(d=>{const o=by[d.cod];if(o){d._heat=o.h;d._lag=o.lag;d._heatAA=o.aa;}});
+    }
+    // ---- LENTE: Detector de armadilha de renda (v1, baseado em enclave) ----
+    function computeTrap(items){
+      const appW=pctRank(items.map(d=>Math.log((d.renda||0)+1)));            // riqueza aparente (PIB pc)
+      const sal=pctRank(items.map(d=>d.remun||0));                            // salário médio formal
+      const lowPob=pctRank(items.map(d=>1-Math.min(1,(d.pob||0)/d.pop)));     // baixa pobreza (CadÚnico)
+      const pobP=pctRank(items.map(d=>Math.min(1,(d.pob||0)/d.pop)));         // peso da vulnerabilidade
+      const trapRaw=items.map((d,i)=>{const realInc=0.5*sal[i]+0.5*lowPob[i];const enclave=Math.max(0,appW[i]-realInc);return 0.5*enclave+0.3*pobP[i]+0.2*(1-realInc);});
+      const tpr=pctRank(trapRaw);
+      items.forEach((d,i)=>{const realInc=0.5*sal[i]+0.5*lowPob[i];d._appW=Math.round(appW[i]*100);d._realInc=Math.round(realInc*100);d._trap=Math.round(tpr[i]*100);d._armadilha=(appW[i]>=0.65&&tpr[i]>=0.70);});
+    }
+    function quantis(v,k){const a=v.slice().sort((x,y)=>x-y),n=a.length,q=[];for(let i=1;i<k;i++)q.push(a[Math.floor((n-1)*i/k)]);return [...new Set(q)];}
+    function classOf(s){for(let i=0;i<breaks.length;i++)if(s<=breaks[i])return i;return breaks.length;}
+
+    // ---- LISA (clusters espaciais) — Local Moran com k-NN + permutação ----
+    function mulberry32(a){return function(){a|=0;a=(a+0x6D2B79F5)|0;let t=Math.imul(a^a>>>15,1|a);t=(t+Math.imul(t^t>>>7,61|t))^t;return ((t^t>>>14)>>>0)/4294967296;};}
+    function centroid(g){let best=null,bl=-1;const rings=g.type==='Polygon'?g.coordinates:g.type==='MultiPolygon'?g.coordinates.map(p=>p[0]):[];for(const r of rings)if(r&&r.length>bl){best=r;bl=r.length;}if(!best)return null;let sx=0,sy=0;for(const c of best){sx+=c[0];sy+=c[1];}return [sx/best.length,sy/best.length];}
+    function ptsOf(items){
+      if(!CENT){CENT={};(GEO.features||[]).forEach(f=>{const c=centroid(f.geometry);if(c)CENT[f.properties._cod]=c;});}
+      return items.filter(d=>CENT[d.cod]).map(d=>({cod:d.cod,x:CENT[d.cod][0],y:CENT[d.cod][1],v:d._g}));
+    }
+    function knnIdx(pts,k){
+      const n=pts.length;const cosLat=Math.cos((pts.reduce((a,p)=>a+p.y,0)/n)*Math.PI/180)||1;
+      return pts.map((p,i)=>{const di=[];for(let j=0;j<n;j++){if(j===i)continue;const dx=(pts[j].x-p.x)*cosLat,dy=pts[j].y-p.y;di.push([dx*dx+dy*dy,j]);}di.sort((a,b)=>a[0]-b[0]);return di.slice(0,k).map(d=>d[1]);});
+    }
+    // Local Moran (LISA) ao padrão Anselin: permutação CONDICIONAL + 999 sorteios + FDR Benjamini-Hochberg (q<0,05).
+    // Natureza exploratória — clusters "interessantes", não prova causal.
+    function lisaClusters(items){
+      const pts=ptsOf(items);const n=pts.length;if(n<10)return null;const k=Math.min(8,n-1);
+      const neigh=knnIdx(pts,k);
+      const mean=pts.reduce((a,p)=>a+p.v,0)/n;const z=pts.map(p=>p.v-mean);const m2=z.reduce((a,v)=>a+v*v,0)/n||1;
+      const rng=mulberry32(20260620);const perms=999;const quad=new Array(n),pval=new Array(n);
+      for(let i=0;i<n;i++){const ns=neigh[i];const kk=ns.length;let lag=0;for(const j of ns)lag+=z[j];lag/=kk;
+        const Ii=(z[i]/m2)*lag;quad[i]=z[i]>0?(lag>0?1:4):(lag>0?3:2);let ge=0;
+        for(let t=0;t<perms;t++){let s=0;for(let u=0;u<kk;u++){let r=(rng()*(n-1))|0;if(r>=i)r++;s+=z[r];}   // condicional: exclui i
+          if(Math.abs((z[i]/m2)*(s/kk))>=Math.abs(Ii))ge++;}
+        pval[i]=(ge+1)/(perms+1);}
+      const padj=bhAdjust(pval);const out={};
+      for(let i=0;i<n;i++)out[pts[i].cod]=padj[i]<0.05?quad[i]:0;
+      return out;
+    }
+    function toggleLisa(){lisaOn=!lisaOn;if(lisaOn){view='score';$('viewSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v==='score'));$('viewNote').style.display='none';}$('lisaBtn').classList.toggle('on',lisaOn);recompute();}
+    function setView(v){view=v;lisaOn=false;$('lisaBtn').classList.remove('on');$('viewSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));const note=VIEWNOTE[v];if(note){$('viewNote').innerHTML=note;$('viewNote').style.display='';}else $('viewNote').style.display='none';recompute();}
+
+    // ---- mapa ----
+    function initMap(){
+      map=new maplibregl.Map({container:'map',style:{version:8,sources:{b:{type:'raster',tiles:['https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'],tileSize:256,attribution:'© OpenStreetMap © CARTO · IBGE, RAIS, SUS/CNES, CadÚnico'}},layers:[{id:'bg',type:'background',paint:{'background-color':'#eef1f4'}},{id:'b',type:'raster',source:'b',paint:{'raster-opacity':.5}}]},center:[-52,-15],zoom:3.3,minZoom:2.5,maxZoom:11,attributionControl:{compact:true}});
+      map.addControl(new maplibregl.NavigationControl(),'top-left');
+      map.on('load',()=>{
+        map.addSource('m',{type:'geojson',data:GEO,promoteId:'_codnum'});
+        map.addLayer({id:'fill',type:'fill',source:'m',paint:{'fill-color':NODATA,'fill-opacity':.85}});
+        map.addLayer({id:'ln',type:'line',source:'m',paint:{'line-color':'#fff','line-width':.3,'line-opacity':.7}});
+        const pop=new maplibregl.Popup({closeButton:false,maxWidth:'260px'});
+        map.on('mousemove','fill',e=>{const f=e.features[0];const d=scoreByCod.get(f.properties._cod);map.getCanvas().style.cursor='pointer';if(!d){pop.remove();return;}pop.setLngLat(e.lngLat).setHTML(ppHTML(d)).addTo(map);});
+        map.on('mouseleave','fill',()=>{pop.remove();map.getCanvas().style.cursor='';});
+        recompute();
+      });
+    }
+    function paint(){
+      if(!map||!map.getLayer('fill'))return;
+      if(lisaOn&&lisaResult){
+        (GEO.features||[]).forEach(f=>{const q=lisaResult[f.properties._cod];map.setFeatureState({source:'m',id:f.properties._codnum},{q:q==null?-1:q});});
+        map.setPaintProperty('fill','fill-color',['match',['coalesce',['feature-state','q'],-1],1,QCOLOR[1],2,QCOLOR[2],3,QCOLOR[3],4,QCOLOR[4],0,QCOLOR[0],NODATA]);
+        return;
+      }
+      const ramp=view==='heat'?RAMP_FIRE:view==='trap'?RAMP_TRAP:INDICES[active].ramp;
+      (GEO.features||[]).forEach(f=>{const d=scoreByCod.get(f.properties._cod);map.setFeatureState({source:'m',id:f.properties._codnum},{ci:d?classOf(viewVal(d)):-1});});
+      const expr=['match',['coalesce',['feature-state','ci'],-1]];ramp.forEach((c,i)=>expr.push(i,c));expr.push(NODATA);
+      map.setPaintProperty('fill','fill-color',expr);
+    }
+    function walk(g,fn){if(!g)return;const w=a=>{if(typeof a[0]==='number')fn(a[0],a[1]);else a.forEach(w);};w(g.coordinates);}
+    function zoomUF(){if(!map)return;let mnx=180,mny=90,mxx=-180,mxy=-90,f=false;(GEO.features||[]).forEach(ft=>{if(curUF&&UF[+String(ft.properties._cod).slice(0,2)]!==curUF)return;f=true;walk(ft.geometry,(x,y)=>{if(x<mnx)mnx=x;if(y<mny)mny=y;if(x>mxx)mxx=x;if(y>mxy)mxy=y;});});if(f)map.fitBounds([[mnx,mny],[mxx,mxy]],{padding:30,duration:700});}
+    function flyTo(cod){let mnx=180,mny=90,mxx=-180,mxy=-90;const f=(GEO.features||[]).find(x=>x.properties._cod===cod);if(!f)return;walk(f.geometry,(x,y)=>{if(x<mnx)mnx=x;if(y<mny)mny=y;if(x>mxx)mxx=x;if(y>mxy)mxy=y;});map.fitBounds([[mnx,mny],[mxx,mxy]],{padding:120,maxZoom:9,duration:800});}
+
+    function ppHTML(d){const I=INDICES[active];
+      const comp=I.comps.map((c,i)=>{const z=d._z?d._z[i]:0;const s=z>0.5?'▲':z<-0.5?'▼':'●';const col=z>0.5?'#1a7f37':z<-0.5?'#b91c1c':'#8a94a1';return `<tr><td>${c.label}</td><td style="color:${col}">${s} ${z>=0?'+':''}${z.toFixed(2)}</td></tr>`;}).join('');
+      const lq=lisaOn&&lisaResult?lisaResult[d.cod]:null;
+      const lt=lq?`<div style="font-size:10px;margin-top:3px;font-weight:700;color:${lq===0?'#8a94a1':QCOLOR[lq]}">Cluster: ${QLABEL[lq]}</div>`:'';
+      let vt='';
+      if(view==='heat')vt=`<div style="font-size:10px;margin-top:3px;font-weight:700;color:#E6550D">🔥 Frente de aquecimento: ${Math.round(d._heat||0)}/100${d._heatAA?' · cluster Alto-Alto (FDR&lt;0,05)':''}</div>`;
+      else if(view==='trap')vt=`<div style="font-size:10px;margin-top:3px;font-weight:700;color:${d._armadilha?'#D7301F':'#8a94a1'}">${d._armadilha?'⚠️ Armadilha provável':'Sem alerta de armadilha'} · risco ${Math.round(d._trap||0)}/100<br><span style="font-weight:400;color:#5b6675">riqueza aparente P${d._appW||0} vs renda real P${d._realInc||0}</span></div>`;
+      return `<div class="pp"><h5>${d.nome}</h5><div class="uf">${UFNOME[d.uf]||''} · ${d.uf}</div><div class="big" style="color:${I.accent}">Score ${d.score}/100</div>${lt}${vt}
+        <table>${I.fields.map(f=>`<tr><td>${f[0]}</td><td>${f[1](d)}</td></tr>`).join('')}</table>
+        <div style="font-size:9.5px;color:#8a94a1;margin-top:6px;border-top:1px solid #eee;padding-top:4px">Composição (z-score por componente)</div>
+        <table>${comp}</table></div>`;}
+    function exportCSV(){
+      const I=INDICES[active];let arr=[...scoreByCod.values()];
+      if(view==='trap')arr.sort((a,b)=>b._trap-a._trap);else if(view==='heat')arr.sort((a,b)=>(b._heatAA-a._heatAA)||(b._heat-a._heat));else arr.sort((a,b)=>b.score-a.score);
+      if(!arr.length)return;
+      const extra=view==='heat'?['frente_aquecimento','cluster_alto_alto']:view==='trap'?['risco_armadilha','armadilha','riqueza_aparente_pct','renda_real_pct']:[];
+      const head=['rank','cod_ibge','municipio','uf','score'].concat(extra).concat(I.comps.map(c=>'z_'+c.key)).concat(I.fields.map(f=>f[0]));
+      const lines=[head.join(';')];
+      arr.forEach((d,i)=>{const ex=view==='heat'?[d._heat||0,d._heatAA?'sim':'nao']:view==='trap'?[d._trap||0,d._armadilha?'sim':'nao',d._appW||0,d._realInc||0]:[];
+        const row=[i+1,d.cod,d.nome,d.uf,d.score].concat(ex).concat(I.comps.map((c,ci)=>(d._z?d._z[ci]:0).toFixed(3))).concat(I.fields.map(f=>String(f[1](d)).replace(/<[^>]+>/g,'').replace(/&[^;]+;/g,' ').trim()));lines.push(row.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(';'));});
+      const blob=new Blob(['﻿'+lines.join('\n')],{type:'text/csv;charset=utf-8;'});
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=('caravela_'+active+'_'+(view!=='score'?view+'_':'')+preset+(curUF?'_'+curUF:'')+'.csv').replace(/[^a-z0-9_.-]/gi,'_').toLowerCase();
+      document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(a.href);
+    }
+
+    // ---- render ----
+    function render(){
+      paint();
+      const I=INDICES[active];let arr=[...scoreByCod.values()];
+      const accent=view==='heat'?'#E6550D':view==='trap'?'#D7301F':I.accent;
+      if(view==='trap'){const flagged=arr.filter(d=>d._armadilha);arr=(flagged.length?flagged:arr).sort((a,b)=>b._trap-a._trap);}
+      else if(view==='heat')arr.sort((a,b)=>(b._heatAA-a._heatAA)||(b._heat-a._heat));
+      else arr.sort((a,b)=>b.score-a.score);
+      $('kCount').textContent=scoreByCod.size.toLocaleString('pt-BR');
+      const title=view==='heat'?'Frente de aquecimento':view==='trap'?'Armadilhas a evitar':I.rankTitle;
+      $('rankTitle').textContent=title+(curUF?' · '+curUF:'');
+      $('rank').innerHTML=arr.slice(0,30).map((d,i)=>{
+        const val=Math.round(viewVal(d));
+        const badge=(view==='heat'&&d._heatAA)?' <span style="font-size:9px;font-weight:800;color:#E6550D;background:#fff5eb;border-radius:4px;padding:1px 4px">AA</span>':(view==='trap'&&d._armadilha)?' <span style="font-size:9px;font-weight:800;color:#D7301F;background:#fde8e8;border-radius:4px;padding:1px 4px">⚠</span>':'';
+        return `<div class="rank-row" data-cod="${d.cod}"><span class="pos">${i+1}</span><span class="nm">${d.nome}${badge}<br><small>${d.uf}</small></span><span class="sc" style="color:${accent}">${val}</span></div>`;
+      }).join('')||'<div style="color:#5b6675;font-size:12px;padding:8px">Sem dados.</div>';
+      $('rank').querySelectorAll('.rank-row').forEach(el=>el.onclick=()=>flyTo(el.dataset.cod));
+      legend();
+    }
+    function legend(){
+      if(lisaOn&&lisaResult){
+        const cnt={1:0,2:0,3:0,4:0,0:0};Object.values(lisaResult).forEach(q=>cnt[q]=(cnt[q]||0)+1);
+        let h='<h4>Clusters espaciais (LISA)</h4>';[1,4,3,2,0].forEach(q=>h+=`<div class="lg-row"><span class="lg-sw" style="background:${QCOLOR[q]}"></span>${QLABEL[q]}<b style="margin-left:auto">${cnt[q]||0}</b></div>`);
+        h+='<div class="nt">Local Moran · FDR q&lt;0,05 · 999 permut. condicionais · k=8 · exploratório (Anselin)</div>';$('legend').innerHTML=h;return;
+      }
+      const ramp=view==='heat'?RAMP_FIRE:view==='trap'?RAMP_TRAP:INDICES[active].ramp;
+      if(!breaks.length){$('legend').innerHTML='<h4>—</h4><div class="lg-row">Sem dados.</div>';return;}
+      const head=view==='heat'?'Frente de aquecimento (0–100)':view==='trap'?'Risco de armadilha (0–100)':`${INDICES[active].label} (0–100)`;
+      let h=`<h4>${head}</h4>`;
+      h+=`<div class="lg-row"><span class="lg-sw" style="background:${ramp[0]}"></span>≤ ${breaks[0]}</div>`;
+      for(let i=0;i<breaks.length-1;i++)h+=`<div class="lg-row"><span class="lg-sw" style="background:${ramp[i+1]}"></span>${breaks[i]} – ${breaks[i+1]}</div>`;
+      const note=view==='heat'?'Contágio espacial · estado atual, não previsão':view==='trap'?'Maior = parece bom, mas mercado pagante menor':'Quantis · maior = mais oportunidade';
+      h+=`<div class="lg-row"><span class="lg-sw" style="background:${ramp[Math.min(ramp.length-1,breaks.length)]}"></span>> ${breaks[breaks.length-1]}</div><div class="lg-row"><span class="lg-sw" style="background:${NODATA}"></span>Sem dado</div><div class="nt">${note}</div>`;
+      $('legend').innerHTML=h;
+    }
+
+    // ---- troca de índice ----
+    document.querySelectorAll('.idxbtn[data-idx]').forEach(b=>b.onclick=()=>{document.querySelectorAll('.idxbtn[data-idx]').forEach(x=>x.classList.remove('on'));b.classList.add('on');active=b.dataset.idx;lisaOn=false;view='score';$('lisaBtn').classList.remove('on');$('viewSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v==='score'));$('viewNote').style.display='none';buildIndexUI();});
+    $('viewSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>setView(b.dataset.v));
+    $('lisaBtn').onclick=toggleLisa; $('csvBtn').onclick=exportCSV;
+
+    load().then(()=>$('loading').style.display='none').catch(e=>{$('loadmsg').textContent='Erro: '+e.message;});
+  </script>
+</body>
+
+</html>
